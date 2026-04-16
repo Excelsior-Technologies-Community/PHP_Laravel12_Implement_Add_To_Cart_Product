@@ -8,9 +8,16 @@ use App\Models\Product;
 class ProductController extends Controller
 {
     // PUBLIC: Show all active products (not soft-deleted)
-    public function index()
+    public function index(Request $request)
     {
-        $products = Product::where('status', 'active')->get();
+        $query = Product::where('status', 'active');
+
+        if ($request->search) {
+            $query->where('name', 'LIKE', '%' . $request->search . '%');
+        }
+
+        $products = $query->get();
+
         return view('products.index', compact('products'));
     }
 
@@ -18,8 +25,8 @@ class ProductController extends Controller
     public function addToCart(Request $request)
     {
         $product = Product::where('id', $request->id)
-                          ->where('status', 'active')
-                          ->first();
+            ->where('status', 'active')
+            ->first();
 
         if (!$product) {
             return response()->json(['status' => 'error', 'message' => 'Product unavailable.'], 404);
@@ -101,10 +108,10 @@ class ProductController extends Controller
 
     // ADMIN: Show all products including trashed
     public function adminIndex()
-{
-    $products = Product::withTrashed()->get(); // fetch all, including deleted
-    return view('admin.products.index', compact('products'));
-}
+    {
+        $products = Product::withTrashed()->get(); // fetch all, including deleted
+        return view('admin.products.index', compact('products'));
+    }
 
 
     // ADMIN: Store new product
@@ -143,17 +150,17 @@ class ProductController extends Controller
     }
 
     // ADMIN: Soft delete product (move to trash)
-   public function destroy($id)
-{
-    $product = Product::find($id);
-    if (!$product) return redirect()->back()->with('error', 'Product not found');
+    public function destroy($id)
+    {
+        $product = Product::find($id);
+        if (!$product) return redirect()->back()->with('error', 'Product not found');
 
-    $product->status = 'deleted';  // mark status as deleted
-    $product->save();
+        $product->status = 'deleted';  // mark status as deleted
+        $product->save();
 
-    $product->delete(); // soft delete
-    return redirect()->back()->with('success', 'Product moved to trash');
-}
+        $product->delete(); // soft delete
+        return redirect()->back()->with('success', 'Product moved to trash');
+    }
 
 
     // ADMIN: Restore soft-deleted product
@@ -176,5 +183,15 @@ class ProductController extends Controller
             return redirect()->back()->with('success', 'Product permanently deleted');
         }
         return redirect()->back()->with('error', 'Product not found');
+    }
+
+    public function clearCart()
+    {
+        session()->forget('cart');
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Cart cleared'
+        ]);
     }
 }

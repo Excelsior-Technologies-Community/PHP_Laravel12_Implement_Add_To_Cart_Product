@@ -40,6 +40,15 @@
         footer a:hover {
             text-decoration: underline;
         }
+
+        /* Card hover effect (small UI upgrade) */
+        .card {
+            transition: 0.3s;
+        }
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+        }
     </style>
 </head>
 <body>
@@ -91,10 +100,36 @@
     @yield('content')
 </div>
 
+<!-- Toast Notification -->
+<div class="position-fixed top-0 end-0 p-3" style="z-index: 9999; margin-top: 70px;">
+  <div id="toastMsg" class="toast text-bg-success border-0">
+    <div class="d-flex">
+      <div class="toast-body" id="toastText">
+        Message here
+      </div>
+      <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+    </div>
+  </div>
+</div>
 
 <!-- Scripts -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
+<!-- Toast Function -->
+<script>
+function showToast(message, type = 'success') {
+    let toastEl = $('#toastMsg');
+
+    $('#toastText').text(message);
+
+    toastEl.removeClass('text-bg-success text-bg-danger');
+    toastEl.addClass(type === 'success' ? 'text-bg-success' : 'text-bg-danger');
+
+    let toast = new bootstrap.Toast(toastEl[0]);
+    toast.show();
+}
+</script>
 
 @stack('scripts')
 </body>

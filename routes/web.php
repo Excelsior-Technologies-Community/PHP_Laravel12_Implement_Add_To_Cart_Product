@@ -16,6 +16,7 @@ Route::post('/add-to-cart', [ProductController::class, 'addToCart'])->name('cart
 Route::get('/cart', [ProductController::class, 'cart'])->name('cart.index');
 Route::post('/cart/update', [ProductController::class, 'updateCart'])->name('cart.update');
 Route::post('/cart/remove', [ProductController::class, 'removeCart'])->name('cart.remove');
+Route::post('/cart/clear', [ProductController::class, 'clearCart'])->name('cart.clear');
 
 // Admin product management (add auth middleware in real app)
 Route::get('/admin/products', [ProductController::class, 'adminIndex'])->name('admin.products.index');
