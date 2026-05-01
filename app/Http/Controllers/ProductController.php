@@ -4,10 +4,10 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\Product;
+use Illuminate\Support\Facades\File;
 
 class ProductController extends Controller
 {
-    // PUBLIC: Show all active products (not soft-deleted)
     public function index(Request $request)
     {
         $query = Product::where('status', 'active');
@@ -16,12 +16,11 @@ class ProductController extends Controller
             $query->where('name', 'LIKE', '%' . $request->search . '%');
         }
 
-        $products = $query->get();
+        $products = $query->paginate(6);
 
         return view('products.index', compact('products'));
     }
 
-    // PUBLIC: Add product to cart (session-based). Expects AJAX POST { id }
     public function addToCart(Request $request)
     {
         $product = Product::where('id', $request->id)
@@ -32,10 +31,8 @@ class ProductController extends Controller
             return response()->json(['status' => 'error', 'message' => 'Product unavailable.'], 404);
         }
 
-        // Get cart from session, or empty array
         $cart = session()->get('cart', []);
 
-        // Increase quantity if exists otherwise add
         if (isset($cart[$product->id])) {
             $cart[$product->id]['quantity']++;
         } else {
@@ -49,7 +46,6 @@ class ProductController extends Controller
 
         session()->put('cart', $cart);
 
-        // total item count
         $cartCount = array_sum(array_column($cart, 'quantity'));
 
         return response()->json([
@@ -60,14 +56,12 @@ class ProductController extends Controller
         ]);
     }
 
-    // PUBLIC: Show cart page
     public function cart()
     {
         $cart = session()->get('cart', []);
         return view('products.cart', compact('cart'));
     }
 
-    // PUBLIC: Update cart item quantity (post AJAX: { id, quantity })
     public function updateCart(Request $request)
     {
         $id = $request->id;
@@ -89,7 +83,6 @@ class ProductController extends Controller
         return response()->json(['status' => 'error', 'message' => 'Product not in cart'], 404);
     }
 
-    // PUBLIC: Remove item from cart (post AJAX: { id })
     public function removeCart(Request $request)
     {
         $id = $request->id;
@@ -104,24 +97,26 @@ class ProductController extends Controller
         return response()->json(['status' => 'error', 'message' => 'Product not in cart'], 404);
     }
 
-    // ---------- ADMIN ACTIONS (no auth guard added here; add middleware in real app) ----------
-
-    // ADMIN: Show all products including trashed
     public function adminIndex()
     {
-        $products = Product::withTrashed()->get(); // fetch all, including deleted
+        $products = Product::withTrashed()->get(); 
         return view('admin.products.index', compact('products'));
     }
 
-
-    // ADMIN: Store new product
     public function store(Request $request)
     {
         $data = $request->validate([
             'name' => 'required|string|max:255',
             'price' => 'required|numeric',
             'status' => 'nullable|in:active,inactive,deleted',
+            'image' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
         ]);
+
+        if ($request->hasFile('image')) {
+            $imageName = time() . '.' . $request->image->extension();
+            $request->image->move(public_path('images'), $imageName);
+            $data['image'] = $imageName;
+        }
 
         $data['created_by'] = auth()->id() ?? 1;
         $data['status'] = $data['status'] ?? 'active';
@@ -131,7 +126,6 @@ class ProductController extends Controller
         return redirect()->back()->with('success', 'Product created');
     }
 
-    // ADMIN: Update product
     public function update(Request $request, $id)
     {
         $product = Product::find($id);
@@ -141,7 +135,17 @@ class ProductController extends Controller
             'name' => 'required|string|max:255',
             'price' => 'required|numeric',
             'status' => 'nullable|in:active,inactive,deleted',
+            'image' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
         ]);
+
+        if ($request->hasFile('image')) {
+            if ($product->image && File::exists(public_path('images/' . $product->image))) {
+                File::delete(public_path('images/' . $product->image));
+            }
+            $imageName = time() . '.' . $request->image->extension();
+            $request->image->move(public_path('images'), $imageName);
+            $data['image'] = $imageName;
+        }
 
         $data['updated_by'] = auth()->id() ?? 1;
         $product->update($data);
@@ -149,21 +153,18 @@ class ProductController extends Controller
         return redirect()->back()->with('success', 'Product updated');
     }
 
-    // ADMIN: Soft delete product (move to trash)
     public function destroy($id)
     {
         $product = Product::find($id);
         if (!$product) return redirect()->back()->with('error', 'Product not found');
 
-        $product->status = 'deleted';  // mark status as deleted
+        $product->status = 'deleted';  
         $product->save();
 
-        $product->delete(); // soft delete
+        $product->delete(); 
         return redirect()->back()->with('success', 'Product moved to trash');
     }
 
-
-    // ADMIN: Restore soft-deleted product
     public function restore($id)
     {
         $product = Product::withTrashed()->where('id', $id)->first();
@@ -174,11 +175,13 @@ class ProductController extends Controller
         return redirect()->back()->with('error', 'Product not found or not trashed');
     }
 
-    // ADMIN: Permanently delete product
     public function forceDelete($id)
     {
         $product = Product::withTrashed()->where('id', $id)->first();
         if ($product) {
+            if ($product->image && File::exists(public_path('images/' . $product->image))) {
+                File::delete(public_path('images/' . $product->image));
+            }
             $product->forceDelete();
             return redirect()->back()->with('success', 'Product permanently deleted');
         }
